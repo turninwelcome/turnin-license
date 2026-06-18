@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Turnin — Homework, handled.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+
+/* ── Themes ── */
+:root{
+  --bg:#0a0a0a;
+  --bg2:#111;
+  --bg3:#161616;
+  --surface:#1a1a1a;
+  --border:rgba(255,255,255,0.07);
+  --border2:rgba(255,255,255,0.14);
+  --text:#f0ede6;
+  --text2:#9a9488;
+  --text3:#5a5650;
+  --accent:#e8d5a3;
+  --accent2:#c4a96d;
+  --green:#4ade80;
+  --radius:14px;
+}
+[data-theme="light"]{
+  --bg:#f5f2ec;
+  --bg2:#edeae3;
+  --bg3:#e8e4dc;
+  --surface:#fff;
+  --border:rgba(0,0,0,0.07);
+  --border2:rgba(0,0,0,0.14);
+  --text:#1a1714;
+  --text2:#6b6560;
+  --text3:#aaa49e;
+  --accent:#8b6914;
+  --accent2:#6b4f0f;
+  --green:#16a34a;
+}
+
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  overflow-x:hidden;
+  transition:background 0.4s,color 0.4s;
+}
+
+/* ── Noise texture overlay ── */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:0;opacity:0.4;
+}
+
+/* ── Nav ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 48px;
+  background:rgba(10,10,10,0.7);
+  backdrop-filter:blur(20px);
+  border-bottom:0.5px solid var(--border);
+  transition:background 0.4s;
+}
+[data-theme="light"] nav{background:rgba(245,242,236,0.8);}
+.nav-logo{
+  font-family:'Playfair Display',serif;
+  font-size:22px;font-weight:700;
+  color:var(--text);letter-spacing:-0.5px;
+}
+.nav-logo span{color:var(--accent);}
+.nav-right{display:flex;align-items:center;gap:20px;}
+.nav-link{
+  font-size:13px;color:var(--text2);text-decoration:none;
+  transition:color 0.2s;letter-spacing:0.2px;
+}
+.nav-link:hover{color:var(--text);}
+.theme-btn{
+  width:36px;height:20px;border-radius:10px;
+  background:var(--border2);border:none;cursor:pointer;
+  position:relative;transition:background 0.3s;
+  flex-shrink:0;
+}
+.theme-btn::after{
+  content:'';position:absolute;
+  width:14px;height:14px;border-radius:50%;
+  background:var(--text);top:3px;left:3px;
+  transition:transform 0.3s,background 0.3s;
+}
+[data-theme="light"] .theme-btn::after{transform:translateX(16px);}
+.nav-cta{
+  background:var(--accent);color:var(--bg);
+  border:none;border-radius:8px;padding:8px 18px;
+  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;
+  cursor:pointer;transition:opacity 0.2s;text-decoration:none;
+  display:inline-block;
+}
+.nav-cta:hover{opacity:0.85;}
+
+/* ── Hero ── */
+.hero{
+  min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;
+  padding:120px 24px 80px;
+  position:relative;
+  overflow:hidden;
+}
+.hero-glow{
+  position:absolute;
+  width:600px;height:600px;
+  background:radial-gradient(circle,rgba(232,213,163,0.08) 0%,transparent 70%);
+  top:50%;left:50%;transform:translate(-50%,-60%);
+  pointer-events:none;
+}
+[data-theme="light"] .hero-glow{
+  background:radial-gradient(circle,rgba(139,105,20,0.07) 0%,transparent 70%);
+}
+.hero-eyebrow{
+  font-family:'DM Mono',monospace;
+  font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--accent);margin-bottom:24px;
+  display:flex;align-items:center;gap:10px;
+}
+.hero-eyebrow::before,.hero-eyebrow::after{
+  content:'';display:block;width:32px;height:0.5px;background:var(--accent);opacity:0.5;
+}
+.hero-title{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(52px,8vw,96px);
+  font-weight:900;line-height:1.0;
+  letter-spacing:-2px;
+  color:var(--text);
+  margin-bottom:16px;
+}
+.hero-title em{
+  font-style:italic;color:var(--accent);
+}
+.hero-sub{
+  font-size:clamp(16px,2vw,20px);
+  color:var(--text2);font-weight:300;
+  max-width:520px;line-height:1.6;
+  margin:0 auto 48px;
+}
+.hero-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+.btn-primary{
+  background:var(--accent);color:var(--bg);
+  border:none;border-radius:10px;
+  padding:14px 32px;font-size:15px;font-weight:500;
+  font-family:'DM Sans',sans-serif;cursor:pointer;
+  transition:opacity 0.2s,transform 0.2s;
+  text-decoration:none;display:inline-block;
+}
+.btn-primary:hover{opacity:0.88;transform:translateY(-1px);}
+.btn-ghost{
+  background:none;color:var(--text);
+  border:0.5px solid var(--border2);border-radius:10px;
+  padding:14px 32px;font-size:15px;font-weight:400;
+  font-family:'DM Sans',sans-serif;cursor:pointer;
+  transition:background 0.2s,transform 0.2s;
+  text-decoration:none;display:inline-block;
+}
+.btn-ghost:hover{background:var(--surface);transform:translateY(-1px);}
+.hero-note{
+  margin-top:20px;font-size:12px;
+  color:var(--text3);font-family:'DM Mono',monospace;
+}
+
+/* ── Section shell ── */
+section{position:relative;z-index:1;}
+.section-inner{max-width:1100px;margin:0 auto;padding:100px 48px;}
+.section-label{
+  font-family:'DM Mono',monospace;font-size:10px;
+  letter-spacing:2.5px;text-transform:uppercase;
+  color:var(--accent);margin-bottom:16px;
+}
+.section-title{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(32px,4vw,52px);
+  font-weight:700;line-height:1.1;letter-spacing:-1px;
+  margin-bottom:16px;
+}
+.section-sub{font-size:16px;color:var(--text2);max-width:480px;line-height:1.65;}
+
+/* ── Divider ── */
+.divider{height:0.5px;background:var(--border);margin:0 48px;}
+
+/* ── How it works ── */
+.steps{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:2px;
+  margin-top:64px;
+  border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;
+}
+.step{
+  background:var(--surface);padding:40px 32px;
+  border-right:0.5px solid var(--border);
+  position:relative;overflow:hidden;
+  transition:background 0.2s;
+}
+.step:last-child{border-right:none;}
+.step:hover{background:var(--bg3);}
+.step-num{
+  font-family:'Playfair Display',serif;
+  font-size:64px;font-weight:900;font-style:italic;
+  color:var(--border2);line-height:1;margin-bottom:24px;
+  transition:color 0.2s;
+}
+.step:hover .step-num{color:var(--accent);opacity:0.3;}
+.step-title{font-size:17px;font-weight:500;margin-bottom:10px;}
+.step-body{font-size:14px;color:var(--text2);line-height:1.65;}
+
+/* ── Features ── */
+.features-grid{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:24px;
+  margin-top:64px;
+}
+.feature-card{
+  background:var(--surface);
+  border:0.5px solid var(--border);
+  border-radius:var(--radius);padding:36px;
+  transition:border-color 0.2s,transform 0.2s;
+  position:relative;overflow:hidden;
+}
+.feature-card::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at top left,rgba(232,213,163,0.04),transparent 60%);
+  pointer-events:none;
+}
+.feature-card:hover{border-color:var(--border2);transform:translateY(-2px);}
+.feature-icon{
+  width:40px;height:40px;border-radius:10px;
+  background:var(--bg3);border:0.5px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;margin-bottom:20px;
+}
+.feature-name{
+  font-family:'DM Mono',monospace;font-size:10px;
+  letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--accent);margin-bottom:8px;
+}
+.feature-title{font-size:18px;font-weight:500;margin-bottom:10px;}
+.feature-body{font-size:14px;color:var(--text2);line-height:1.65;}
+
+/* ── Pricing & Shop ── */
+.shop-container{
+  margin-top:48px;
+  display:grid;grid-template-columns:1fr 400px;gap:32px;
+  align-items:start;
+}
+.shop-menu{
+  background:var(--surface);border:0.5px solid var(--border);
+  border-radius:var(--radius);padding:40px;
+}
+.shop-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 0;border-bottom:0.5px solid var(--border);
+  cursor:pointer;
+}
+.shop-item:last-child{border-bottom:none;}
+.shop-item-left{display:flex;gap:16px;align-items:center;}
+.shop-check{
+  width:22px;height:22px;border-radius:6px;border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  color:transparent;transition:all 0.2s;
+}
+.shop-item.active .shop-check{
+  background:var(--accent);border-color:transparent;color:var(--bg);
+}
+.shop-info h4{font-size:16px;font-weight:500;margin-bottom:4px;}
+.shop-info p{font-size:13px;color:var(--text2);}
+.shop-price{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;}
+
+.order-panel{
+  background:var(--bg3);border:1px solid var(--accent);
+  border-radius:var(--radius);padding:32px;
+  position:sticky;top:100px;
+}
+.order-total-row{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:24px;padding-bottom:16px;border-bottom:0.5px solid var(--border2);
+}
+.order-total-row span{font-size:14px;color:var(--text2);}
+.order-total-row strong{font-family:'Playfair Display',serif;font-size:32px;color:var(--text);}
+
+.buy-input{
+  width:100%;background:var(--bg2);border:0.5px solid var(--border2);
+  border-radius:8px;padding:12px;color:var(--text);font-size:14px;
+  margin-bottom:16px;outline:none;
+}
+.buy-input:focus{border-color:var(--accent);}
+
+.order-result{
+  margin-top:24px;text-align:center;
+  padding:20px;background:var(--surface);border-radius:10px;
+  border:0.5px dashed var(--accent);
+}
+.order-id{font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:var(--accent);margin:8px 0;}
+
+/* ── FAQ ── */
+.faq{display:flex;flex-direction:column;gap:0;margin-top:56px;border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.faq-item{border-bottom:0.5px solid var(--border);}
+.faq-item:last-child{border-bottom:none;}
+.faq-q{
+  width:100%;background:none;border:none;text-align:left;
+  padding:24px 28px;cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;
+  font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;
+  color:var(--text);transition:background 0.15s;
+}
+.faq-q:hover{background:var(--bg3);}
+.faq-icon{
+  width:24px;height:24px;border-radius:50%;
+  background:var(--border2);display:flex;align-items:center;justify-content:center;
+  font-size:14px;flex-shrink:0;transition:transform 0.2s,background 0.2s;color:var(--text2);
+}
+.faq-item.open .faq-icon{transform:rotate(45deg);background:var(--accent);color:var(--bg);}
+.faq-a{
+  max-height:0;overflow:hidden;transition:max-height 0.3s ease,padding 0.3s;
+  font-size:14px;color:var(--text2);line-height:1.7;
+  padding:0 28px;
+}
+.faq-item.open .faq-a{max-height:200px;padding:0 28px 24px;}
+
+/* ── Footer ── */
+footer{
+  border-top:0.5px solid var(--border);
+  padding:40px 48px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:16px;
+}
+.footer-logo{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--text2);}
+.footer-logo span{color:var(--accent);}
+.footer-note{font-size:12px;color:var(--text3);font-family:'DM Mono',monospace;}
+.venmo-link{
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;color:var(--text2);text-decoration:none;
+  border:0.5px solid var(--border2);border-radius:8px;
+  padding:8px 16px;transition:background 0.15s;
+}
+.venmo-link:hover{background:var(--surface);}
+
+/* ── Animations ── */
+.fade-up{opacity:0;transform:translateY(24px);transition:opacity 0.6s ease,transform 0.6s ease;}
+.fade-up.visible{opacity:1;transform:none;}
+
+@media(max-width:900px){
+  .shop-container{grid-template-columns:1fr;}
+  .order-panel{position:static;margin-top:20px;}
+}
+@media(max-width:768px){
+  nav{padding:16px 20px;}
+  .section-inner{padding:72px 20px;}
+  .steps{grid-template-columns:1fr;}
+  .step{border-right:none;border-bottom:0.5px solid var(--border);}
+  .features-grid{grid-template-columns:1fr;}
+  footer{flex-direction:column;align-items:flex-start;}
+}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-logo">Turn<span>in</span></div>
+  <div class="nav-right">
+    <a href="#features" class="nav-link">Features</a>
+    <a href="#shop" class="nav-link">Shop</a>
+    <a href="#faq" class="nav-link">FAQ</a>
+    <button class="theme-btn" onclick="toggleTheme()" aria-label="toggle theme"></button>
+    <a href="#shop" class="nav-cta">Get started</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-eyebrow">The professional homework agent</div>
+  <h1 class="hero-title">Homework,<br/><em>handled.</em></h1>
+  <p class="hero-sub">The all-in-one desktop application that reads your Schoology assignments and delivers submission-ready work automatically.</p>
+  <div class="hero-actions">
+    <a href="#shop" class="btn-primary">Build your bundle</a>
+    <a href="#how-it-works" class="btn-ghost">See how it works</a>
+  </div>
+  <p class="hero-note">Standalone App &nbsp;·&nbsp; Secure &nbsp;·&nbsp; Professional Grade</p>
+</section>
+
+<div class="divider"></div>
+
+<!-- How it works -->
+<section id="how-it-works">
+  <div class="section-inner">
+    <div class="section-label fade-up">Workflow</div>
+    <h2 class="section-title fade-up">One App.<br/>Total Control.</h2>
+    <div class="steps fade-up">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-title">Secure Login</div>
+        <div class="step-body">Open the Turnin app. Sign in through the secure browser bridge. Your data stays on your machine.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-title">Tailored Completion</div>
+        <div class="step-body">Select your assignment. Our engine reads every instruction and material before crafting the solution.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-title">Instant Export</div>
+        <div class="step-body">Get a perfectly formatted PDF or Word doc. Review, submit, and get back to your life.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- Features -->
+<section id="features">
+  <div class="section-inner">
+    <div class="section-label fade-up">Technology</div>
+    <h2 class="section-title fade-up">Built different.</h2>
+    <p class="section-sub fade-up">Every feature is engineered specifically for the way Schoology works — not a generic chatbot bolted onto a browser.</p>
+    <div class="features-grid fade-up">
+      <div class="feature-card">
+        <div class="feature-icon">🧠</div>
+        <div class="feature-name">Neural Style Matching™</div>
+        <div class="feature-title">Writes like you, not a robot</div>
+        <div class="feature-body">Analyzes your writing voice, vocabulary, and sentence structure to produce work that sounds authentic.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📚</div>
+        <div class="feature-name">DeepMaterial Scan™</div>
+        <div class="feature-title">Reads every file you're given</div>
+        <div class="feature-body">PDFs, Google Docs, Slides, images, diagrams — understands all course materials before writing.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📝</div>
+        <div class="feature-name">Format Intelligence™</div>
+        <div class="feature-title">Chicago, MLA, custom — nailed</div>
+        <div class="feature-body">Automatically applies the right citation style, font, and spacing for a professional submission.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <div class="feature-name">Standalone Performance</div>
+        <div class="feature-title">Runs locally, stays private</div>
+        <div class="feature-body">A standalone desktop application. No laggy web wrappers. Maximum security and performance.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- Shop -->
+<section id="shop">
+  <div class="section-inner">
+    <div class="section-label fade-up">The Shop</div>
+    <h2 class="section-title fade-up">Build your bundle.</h2>
+    <p class="section-sub fade-up">Customize Turnin to your needs. Select your features, get your Order ID, and unlock the app.</p>
+
+    <div class="shop-container fade-up">
+      <div class="shop-menu">
+        <div class="shop-item active" data-id="base" data-price="2">
+          <div class="shop-item-left">
+            <div class="shop-check">✓</div>
+            <div class="shop-info">
+              <h4>Base Completion & Design</h4>
+              <p>The core engine. Reads Schoology and generates solutions.</p>
+            </div>
+          </div>
+          <div class="shop-price">$2</div>
+        </div>
+
+        <div class="shop-item" data-id="humanizer" data-price="2" onclick="toggleItem(this)">
+          <div class="shop-item-left">
+            <div class="shop-check">✓</div>
+            <div class="shop-info">
+              <h4>Humanizer Logic</h4>
+              <p>Neural Style Matching™ for authentic writing voice.</p>
+            </div>
+          </div>
+          <div class="shop-price">+$2</div>
+        </div>
+
+        <div class="shop-item" data-id="stylist" data-price="2" onclick="toggleItem(this)">
+          <div class="shop-item-left">
+            <div class="shop-check">✓</div>
+            <div class="shop-info">
+              <h4>Stylist Mode</h4>
+              <p>Advanced tone, vocabulary, and formatting control.</p>
+            </div>
+          </div>
+          <div class="shop-price">+$2</div>
+        </div>
+
+        <div class="shop-item" data-id="deep_scan" data-price="3" onclick="toggleItem(this)">
+          <div class="shop-item-left">
+            <div class="shop-check">✓</div>
+            <div class="shop-info">
+              <h4>DeepMaterial Scan</h4>
+              <p>Reads PDFs, linked docs, and course materials for context.</p>
+            </div>
+          </div>
+          <div class="shop-price">+$3</div>
+        </div>
+
+        <div class="shop-item" data-id="typist" data-price="3" onclick="toggleItem(this)">
+          <div class="shop-item-left">
+            <div class="shop-check">✓</div>
+            <div class="shop-info">
+              <h4>Automated Typist</h4>
+              <p>Automatic export and submission formatting.</p>
+            </div>
+          </div>
+          <div class="shop-price">+$3</div>
+        </div>
+      </div>
+
+      <div class="order-panel">
+        <div class="order-total-row">
+          <span>Total</span>
+          <strong id="totalPrice">$2</strong>
+        </div>
+        
+        <input type="email" id="userEmail" class="buy-input" placeholder="Your email address" required />
+        
+        <button id="orderBtn" class="btn-primary" style="width:100%" onclick="submitOrder()">Generate Order ID</button>
+        
+        <div id="orderResult" class="order-result" style="display:none">
+          <p style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--text3)">Your Order ID</p>
+          <div class="order-id" id="displayOrderId">ORD-XXXX</div>
+          <p style="font-size:13px; color:var(--text2); line-height:1.5">
+            Pay <strong id="finalAmount">$2</strong> via Venmo and include <strong id="noteId">ORD-XXXX</strong> in the note.
+          </p>
+          <a href="https://account.venmo.com/u/ezra-mezrich" target="_blank" class="btn-ghost" style="margin-top:16px; width:100%">Open Venmo</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="section-inner">
+    <div class="section-label fade-up">FAQ</div>
+    <h2 class="section-title fade-up">Good questions.</h2>
+    <div class="faq fade-up">
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          How do I get the app?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a">Once your Order ID is approved (usually within 5-10 minutes of payment), you'll receive a license key via email. You can download the latest Turnin app directly from the link in that email.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Is it safe to use?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a">Yes. Turnin is a standalone desktop application. Your passwords and data stay on your machine. We use a secure browser bridge to interact with Schoology.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Can I upgrade my features later?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a">Absolutely. You can return to this shop at any time, select the new features you want, and generate a "Top-up" order to add them to your existing key.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-logo">Turn<span>in</span></div>
+  <div class="footer-note">© 2026 Turnin · The Professional Homework Agent</div>
+  <a href="https://account.venmo.com/u/ezra-mezrich" target="_blank" class="venmo-link">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 2C20.9 4.3 21.5 6.5 21.5 9.3c0 5.8-5 13.4-9 17.7h-8L1 2h7l2.5 10.2C12 9.2 13.8 5.7 13.8 3.2c0-1.3-.2-2.2-.6-3L19.5 2z"/></svg>
+    Pay via Venmo
+  </a>
+</footer>
+
+<script>
+// API is hosted on the same domain
+const RENDER_URL = "";
+
+// Theme
+function toggleTheme(){
+  const d=document.documentElement;
+  d.dataset.theme=d.dataset.theme==='light'?'':'light';
+  localStorage.setItem('theme',d.dataset.theme);
+}
+const saved=localStorage.getItem('theme');
+if(saved)document.documentElement.dataset.theme=saved;
+
+// Shop logic
+function toggleItem(el) {
+  el.classList.toggle('active');
+  calculateTotal();
+}
+
+function calculateTotal() {
+  let total = 2; // Base price
+  document.querySelectorAll('.shop-item.active').forEach(item => {
+    if (item.dataset.id !== 'base') {
+      total += parseInt(item.dataset.price);
+    }
+  });
+  document.getElementById('totalPrice').textContent = `$${total}`;
+}
+
+async function submitOrder() {
+  const email = document.getElementById('userEmail').value.trim();
+  if (!email) { alert("Please enter your email."); return; }
+  
+  const btn = document.getElementById('orderBtn');
+  btn.disabled = true;
+  btn.textContent = "Processing...";
+
+  const features = {
+    base: true,
+    humanizer: document.querySelector('[data-id="humanizer"]').classList.contains('active'),
+    stylist: document.querySelector('[data-id="stylist"]').classList.contains('active'),
+    deep_scan: document.querySelector('[data-id="deep_scan"]').classList.contains('active'),
+    typist: document.querySelector('[data-id="typist"]').classList.contains('active')
+  };
+  
+  const total = parseInt(document.getElementById('totalPrice').textContent.replace('$',''));
+
+  try {
+    const res = await fetch(`${RENDER_URL}/api/order`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ email, features, total_price: total })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('orderResult').style.display = 'block';
+      document.getElementById('displayOrderId').textContent = data.order_id;
+      document.getElementById('noteId').textContent = data.order_id;
+      document.getElementById('finalAmount').textContent = `$${total}`;
+      btn.style.display = 'none';
+      document.getElementById('userEmail').style.display = 'none';
+    } else {
+      alert("Error: " + data.error);
+      btn.disabled = false;
+      btn.textContent = "Generate Order ID";
+    }
+  } catch (e) {
+    alert("Could not reach the server. Please try again later.");
+    btn.disabled = false;
+    btn.textContent = "Generate Order ID";
+  }
+}
+
+// FAQ
+function toggleFaq(btn){
+  const item=btn.closest('.faq-item');
+  const wasOpen=item.classList.contains('open');
+  document.querySelectorAll('.faq-item').forEach(i=>i.classList.remove('open'));
+  if(!wasOpen)item.classList.add('open');
+}
+
+// Scroll fade-up
+const obs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');});
+},{threshold:0.1});
+document.querySelectorAll('.fade-up').forEach(el=>obs.observe(el));
+</script>
+</body>
+</html>
