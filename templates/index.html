@@ -483,18 +483,18 @@ footer{
               <p>Neural Style Matching™ for authentic writing voice.</p>
             </div>
           </div>
-          <div class="shop-price">+$2</div>
+          <div class="shop-price" data-paid-label="+$2" data-free-label="FREE">+$2</div>
         </div>
 
         <div class="shop-item" data-id="stylist" data-price="2" onclick="toggleItem(this)">
           <div class="shop-item-left">
             <div class="shop-check">✓</div>
             <div class="shop-info">
-              <h4>Stylist Mode</h4>
-              <p>Advanced tone, vocabulary, and formatting control.</p>
+              <h4>Neural Style Matching</h4>
+              <p>Analyzes 2-3 past assignments to match tone, vocabulary, and formatting.</p>
             </div>
           </div>
-          <div class="shop-price">+$2</div>
+          <div class="shop-price" data-paid-label="+$2" data-free-label="FREE">+$2</div>
         </div>
 
         <div class="shop-item" data-id="deep_scan" data-price="3" onclick="toggleItem(this)">
@@ -601,19 +601,55 @@ if(saved)document.documentElement.dataset.theme=saved;
 
 // Shop logic
 function toggleItem(el) {
+  if (el.dataset.id === 'humanizer' || el.dataset.id === 'stylist') {
+    const typistActive = document.querySelector('[data-id="typist"]').classList.contains('active');
+    if (typistActive) return;
+  }
+
   el.classList.toggle('active');
+  syncTypistBundle();
   calculateTotal();
+}
+
+function setShopPriceLabel(item, isFree) {
+  const priceEl = item.querySelector('.shop-price');
+  if (!priceEl) return;
+  priceEl.textContent = isFree ? (priceEl.dataset.freeLabel || 'FREE') : (priceEl.dataset.paidLabel || `+$${item.dataset.price}`);
+}
+
+function syncTypistBundle() {
+  const typist = document.querySelector('[data-id="typist"]');
+  const humanizer = document.querySelector('[data-id="humanizer"]');
+  const stylist = document.querySelector('[data-id="stylist"]');
+  const typistActive = typist.classList.contains('active');
+
+  if (typistActive) {
+    humanizer.classList.add('active');
+    stylist.classList.add('active');
+    humanizer.classList.add('bundle-locked');
+    stylist.classList.add('bundle-locked');
+  } else {
+    humanizer.classList.remove('bundle-locked');
+    stylist.classList.remove('bundle-locked');
+  }
+
+  setShopPriceLabel(humanizer, typistActive);
+  setShopPriceLabel(stylist, typistActive);
 }
 
 function calculateTotal() {
   let total = 2; // Base price
+  const typistActive = document.querySelector('[data-id="typist"]').classList.contains('active');
   document.querySelectorAll('.shop-item.active').forEach(item => {
-    if (item.dataset.id !== 'base') {
-      total += parseInt(item.dataset.price);
-    }
+    if (item.dataset.id === 'base') return;
+    if (typistActive && (item.dataset.id === 'humanizer' || item.dataset.id === 'stylist')) return;
+    total += parseInt(item.dataset.price);
   });
   document.getElementById('totalPrice').textContent = `$${total}`;
 }
+
+syncTypistBundle();
+calculateTotal();
 
 async function submitOrder() {
   const email = document.getElementById('userEmail').value.trim();

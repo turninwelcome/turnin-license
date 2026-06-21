@@ -22,6 +22,7 @@ def index():
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
 SECRET_KEY = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 MAIL_PROXY_URL = os.environ.get("MAIL_PROXY_URL")
+APP_DOWNLOAD_URL = os.environ.get("APP_DOWNLOAD_URL", "https://turnin.app")
 
 # --- DATA STORAGE ---
 # Use absolute path for the data file so it doesn't get lost in Render subdirectories
@@ -83,6 +84,11 @@ def send_email(to_email, key, features):
         <p>Your license key has been activated.</p>
         <div style="background: #f5f2ec; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 20px; font-weight: bold; text-align: center; color: #1a1714; margin: 20px 0;">
             {key}
+        </div>
+        <div style="text-align: center; margin: 20px 0 24px;">
+            <a href="{APP_DOWNLOAD_URL}" style="display: inline-block; background: #8b6914; color: #ffffff; text-decoration: none; padding: 12px 22px; border-radius: 8px; font-weight: 700;">
+                Download the App
+            </a>
         </div>
         <p><strong>Enabled Features:</strong> {feature_text}</p>
         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
