@@ -23,6 +23,7 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
 SECRET_KEY = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 MAIL_PROXY_URL = os.environ.get("MAIL_PROXY_URL")
 APP_DOWNLOAD_URL = os.environ.get("APP_DOWNLOAD_URL", "https://turnin.app")
+LATEST_APP_VERSION = os.environ.get("LATEST_APP_VERSION", "0.1.0").strip()
 
 # --- DATA STORAGE ---
 # Use absolute path for the data file so it doesn't get lost in Render subdirectories
@@ -172,6 +173,14 @@ def validate_key():
     return jsonify({
         "valid": True, 
         "features": key_info.get("features", {"base": True})
+    })
+
+@app.route("/api/latest-release")
+def latest_release():
+    return jsonify({
+        "ok": True,
+        "latest_version": LATEST_APP_VERSION,
+        "download_url": APP_DOWNLOAD_URL,
     })
 
 # --- ADMIN ROUTES ---
