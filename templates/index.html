@@ -274,6 +274,13 @@ section{position:relative;z-index:1;}
 .shop-info h4{font-size:16px;font-weight:500;margin-bottom:4px;}
 .shop-info p{font-size:13px;color:var(--text2);}
 .shop-price{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;}
+.shop-ai-map{
+  margin-top:18px;padding:18px 20px;border:0.5px solid var(--border);border-radius:18px;background:var(--bg3);
+}
+.shop-ai-map-title{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.shop-ai-map-list{display:grid;gap:10px;font-size:13px;color:var(--text2);line-height:1.5}
+.hidden-until-typist{display:none}
+.shop-item.hidden-until-typist{display:none}
 
 .order-panel{
   background:var(--bg3);border:1px solid var(--accent);
@@ -461,7 +468,6 @@ footer{
     <div class="section-label fade-up">The Shop</div>
     <h2 class="section-title fade-up">Build your bundle.</h2>
     <p class="section-sub fade-up">Customize Turnin to your needs. Select your features, get your Order ID, and unlock the app.</p>
-
     <div class="shop-container fade-up">
       <div class="shop-menu">
         <div class="shop-item active" data-id="base" data-price="2">
@@ -517,6 +523,17 @@ footer{
             </div>
           </div>
           <div class="shop-price">+$3</div>
+        </div>
+
+        <div class="shop-item hidden-until-typist" data-id="mac_auto_wake" data-price="2" onclick="toggleItem(this)">
+          <div class="shop-item-left">
+            <div class="shop-check">✓</div>
+            <div class="shop-info">
+              <h4>Mac Auto-Wake</h4>
+              <p>Shown only after Natural Typist is selected. One-time system wake for the next scheduled typing session.</p>
+            </div>
+          </div>
+          <div class="shop-price" data-paid-label="+$2" data-free-label="Included">+$2</div>
         </div>
       </div>
 
@@ -621,16 +638,22 @@ function syncTypistBundle() {
   const typist = document.querySelector('[data-id="typist"]');
   const humanizer = document.querySelector('[data-id="humanizer"]');
   const stylist = document.querySelector('[data-id="stylist"]');
+  const wake = document.querySelector('[data-id="mac_auto_wake"]');
   const typistActive = typist.classList.contains('active');
 
   if (typistActive) {
     humanizer.classList.add('active');
     stylist.classList.add('active');
+    if (wake) wake.classList.remove('hidden-until-typist');
     humanizer.classList.add('bundle-locked');
     stylist.classList.add('bundle-locked');
   } else {
     humanizer.classList.remove('bundle-locked');
     stylist.classList.remove('bundle-locked');
+    if (wake) {
+      wake.classList.add('hidden-until-typist');
+      wake.classList.remove('active');
+    }
   }
 
   setShopPriceLabel(humanizer, typistActive);
@@ -664,7 +687,8 @@ async function submitOrder() {
     humanizer: document.querySelector('[data-id="humanizer"]').classList.contains('active'),
     stylist: document.querySelector('[data-id="stylist"]').classList.contains('active'),
     deep_scan: document.querySelector('[data-id="deep_scan"]').classList.contains('active'),
-    typist: document.querySelector('[data-id="typist"]').classList.contains('active')
+    typist: document.querySelector('[data-id="typist"]').classList.contains('active'),
+    mac_auto_wake: document.querySelector('[data-id="mac_auto_wake"]')?.classList.contains('active') || false
   };
   
   const total = parseInt(document.getElementById('totalPrice').textContent.replace('$',''));
