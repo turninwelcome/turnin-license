@@ -288,11 +288,26 @@ section{position:relative;z-index:1;}
   position:sticky;top:100px;
 }
 .order-total-row{
-  display:flex;justify-content:space-between;align-items:center;
-  margin-bottom:24px;padding-bottom:16px;border-bottom:0.5px solid var(--border2);
+  display:flex;justify-content:space-between;align-items:flex-end;gap:20px;
+  margin-bottom:18px;padding-bottom:16px;border-bottom:0.5px solid var(--border2);
 }
+.order-total-label{display:flex;flex-direction:column;gap:4px;}
 .order-total-row span{font-size:14px;color:var(--text2);}
-.order-total-row strong{font-family:'Playfair Display',serif;font-size:32px;color:var(--text);}
+.order-total-sub{font-size:12px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:0.5px;}
+.order-total-value{display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right;}
+.order-total-value strong{font-family:'Playfair Display',serif;font-size:32px;color:var(--text);line-height:1;}
+.order-fee-line{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:-6px;margin-bottom:18px;padding:10px 0 0;
+  color:var(--text2);font-size:13px;
+}
+.order-fee-line .fee-pill{
+  font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;
+  color:var(--accent);text-transform:uppercase;
+}
+.order-fee-line .fee-amount{
+  font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--text);
+}
 
 .buy-input{
   width:100%;background:var(--bg2);border:0.5px solid var(--border2);
@@ -530,7 +545,7 @@ footer{
             <div class="shop-check">✓</div>
             <div class="shop-info">
               <h4>Mac Auto-Wake</h4>
-              <p>If your Mac is asleep at the scheduled time, Turnin can wake it once so the typing session starts on time instead of waiting for you to open the computer first.</p>
+              <p>If your Mac is asleep at the scheduled time, Turnin can wake it once so the typing session starts on time instead of waiting for you to open the computer first. Full details are in the <a href="#auto-wake-faq" style="color:var(--accent);text-decoration:none">FAQ</a>.</p>
             </div>
           </div>
           <div class="shop-price" data-paid-label="+$2" data-free-label="Included">+$2</div>
@@ -539,8 +554,21 @@ footer{
 
       <div class="order-panel">
         <div class="order-total-row">
-          <span>Total</span>
-          <strong id="totalPrice">$2</strong>
+          <div class="order-total-label">
+            <span>Total</span>
+            <div class="order-total-sub">Completion price + one-time setup fee</div>
+          </div>
+          <div class="order-total-value">
+            <strong id="totalPrice">$3.25</strong>
+          </div>
+        </div>
+        <div class="order-fee-line">
+          <span class="fee-pill">Completion</span>
+          <span class="fee-amount" id="completionPrice">$2.00</span>
+        </div>
+        <div class="order-fee-line" style="margin-top:-12px;">
+          <span class="fee-pill">One-time fee</span>
+          <span class="fee-amount">+$1.25</span>
         </div>
         
         <input type="email" id="userEmail" class="buy-input" placeholder="Your email address" required />
@@ -582,12 +610,26 @@ footer{
         </button>
         <div class="faq-a">Yes. Turnin is a standalone desktop application. Your passwords and data stay on your machine. We use a secure browser bridge to interact with Schoology.</div>
       </div>
-      <div class="faq-item">
+      <div class="faq-item" id="auto-wake-faq">
         <button class="faq-q" onclick="toggleFaq(this)">
           Can I upgrade my features later?
           <span class="faq-icon">+</span>
         </button>
         <div class="faq-a">Absolutely. You can return to this shop at any time, select the new features you want, and generate a "Top-up" order to add them to your existing key.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Why would I want auto-wake?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a">Auto-wake exists for the specific case where your Mac is asleep when the next typing session is due. In the normal alarm flow, Turnin waits until the scheduled time and then checks whether the computer is already awake. If it is, the typing session starts immediately. If it is not, nothing can happen until you manually open the machine. Auto-wake changes that one step: Turnin asks macOS to wake the computer for the scheduled session, then the app can continue with the same staged typing flow without waiting for you to notice the time. That matters when you are away from the desk, your laptop lid is closed, or the machine would otherwise stay asleep past the session window. It is meant to preserve timing, not change the draft process.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          What happens without auto-wake?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a">Turnin still follows the scheduled session. The difference is that it waits for the computer to already be awake when the time arrives. If you open the Mac late, the session starts late. Auto-wake removes that dependency by trying to wake the Mac at the scheduled moment so the app can proceed on time.</div>
       </div>
     </div>
   </div>
@@ -661,14 +703,18 @@ function syncTypistBundle() {
 }
 
 function calculateTotal() {
-  let total = 2; // Base price
+  let completion = 2; // Base completion price
   const typistActive = document.querySelector('[data-id="typist"]').classList.contains('active');
   document.querySelectorAll('.shop-item.active').forEach(item => {
     if (item.dataset.id === 'base') return;
     if (typistActive && (item.dataset.id === 'humanizer' || item.dataset.id === 'stylist')) return;
-    total += parseInt(item.dataset.price);
+    completion += parseFloat(item.dataset.price);
   });
-  document.getElementById('totalPrice').textContent = `$${total}`;
+  const fee = 1.25;
+  const total = completion + fee;
+  const completionEl = document.getElementById('completionPrice');
+  if (completionEl) completionEl.textContent = `$${completion.toFixed(2)}`;
+  document.getElementById('totalPrice').textContent = `$${total.toFixed(2)}`;
 }
 
 syncTypistBundle();
@@ -691,7 +737,7 @@ async function submitOrder() {
     mac_auto_wake: document.querySelector('[data-id="mac_auto_wake"]')?.classList.contains('active') || false
   };
   
-  const total = parseInt(document.getElementById('totalPrice').textContent.replace('$',''));
+  const total = parseFloat(document.getElementById('totalPrice').textContent.replace('$',''));
 
   try {
     const res = await fetch(`${RENDER_URL}/api/order`, {
