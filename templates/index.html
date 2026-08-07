@@ -482,7 +482,7 @@ footer{
   <div class="section-inner">
     <div class="section-label fade-up">The Shop</div>
     <h2 class="section-title fade-up">Build your bundle.</h2>
-    <p class="section-sub fade-up">Customize Turnin to your needs. Select your features, get your Order ID, and unlock the app.</p>
+    <p class="section-sub fade-up">Customize Turnin to your needs. Select your features, pay via Venmo, and unlock the app.</p>
     <div class="shop-container fade-up">
       <div class="shop-menu">
         <div class="shop-item active" data-id="base" data-price="2">
@@ -573,13 +573,11 @@ footer{
         
         <input type="email" id="userEmail" class="buy-input" placeholder="Your email address" required />
         
-        <button id="orderBtn" class="btn-primary" style="width:100%" onclick="submitOrder()">Generate Order ID</button>
+        <button id="orderBtn" class="btn-primary" style="width:100%" onclick="submitOrder()">Pay via Venmo</button>
         
         <div id="orderResult" class="order-result" style="display:none">
-          <p style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--text3)">Your Order ID</p>
-          <div class="order-id" id="displayOrderId">ORD-XXXX</div>
           <p style="font-size:13px; color:var(--text2); line-height:1.5">
-            Pay <strong id="finalAmount">$2</strong> via Venmo and include <strong id="noteId">ORD-XXXX</strong> in the note.
+            This purchase unlocks exactly one assignment. Pay <strong id="finalAmount">$2</strong> via Venmo to complete activation.
           </p>
           <a href="https://account.venmo.com/u/ezra-mezrich" target="_blank" class="btn-ghost" style="margin-top:16px; width:100%">Open Venmo</a>
         </div>
@@ -601,7 +599,7 @@ footer{
           How do I get the app?
           <span class="faq-icon">+</span>
         </button>
-        <div class="faq-a">Once your Order ID is approved (usually within 5-10 minutes of payment), you'll receive a license key via email. You can download the latest Turnin app directly from the link in that email.</div>
+        <div class="faq-a">Once payment is approved (usually within 5-10 minutes), you'll receive a license key via email. You can download the latest Turnin app directly from the link in that email.</div>
       </div>
       <div class="faq-item">
         <button class="faq-q" onclick="toggleFaq(this)">
@@ -746,24 +744,22 @@ async function submitOrder() {
       body: JSON.stringify({ email, features, total_price: total })
     });
     const data = await res.json();
-    if (data.ok) {
-      document.getElementById('orderResult').style.display = 'block';
-      document.getElementById('displayOrderId').textContent = data.order_id;
-      document.getElementById('noteId').textContent = data.order_id;
-      document.getElementById('finalAmount').textContent = `$${total}`;
-      btn.style.display = 'none';
-      document.getElementById('userEmail').style.display = 'none';
-    } else {
-      alert("Error: " + data.error);
+      if (data.ok) {
+        document.getElementById('orderResult').style.display = 'block';
+        document.getElementById('finalAmount').textContent = `$${total}`;
+        btn.style.display = 'none';
+        document.getElementById('userEmail').style.display = 'none';
+      } else {
+        alert("Error: " + data.error);
+        btn.disabled = false;
+        btn.textContent = "Pay via Venmo";
+      }
+    } catch (e) {
+      alert("Could not reach the server. Please try again later.");
       btn.disabled = false;
-      btn.textContent = "Generate Order ID";
+      btn.textContent = "Pay via Venmo";
     }
-  } catch (e) {
-    alert("Could not reach the server. Please try again later.");
-    btn.disabled = false;
-    btn.textContent = "Generate Order ID";
   }
-}
 
 // FAQ
 function toggleFaq(btn){
