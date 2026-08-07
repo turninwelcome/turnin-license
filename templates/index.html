@@ -529,6 +529,17 @@ footer{
           <div class="shop-price">+$3</div>
         </div>
 
+        <div class="shop-item" data-id="web_search" data-price="1" onclick="toggleItem(this)">
+          <div class="shop-item-left">
+            <div class="shop-check">✓</div>
+            <div class="shop-info">
+              <h4>Web Search Add-on</h4>
+              <p>Allows Turnin to use approved web research sources when course materials are not enough.</p>
+            </div>
+          </div>
+          <div class="shop-price">+$1</div>
+        </div>
+
         <div class="shop-item" data-id="typist" data-price="3" onclick="toggleItem(this)">
           <div class="shop-item-left">
             <div class="shop-check">✓</div>
@@ -731,6 +742,7 @@ async function submitOrder() {
     humanizer: document.querySelector('[data-id="humanizer"]').classList.contains('active'),
     stylist: document.querySelector('[data-id="stylist"]').classList.contains('active'),
     deep_scan: document.querySelector('[data-id="deep_scan"]').classList.contains('active'),
+    web_search: document.querySelector('[data-id="web_search"]').classList.contains('active'),
     typist: document.querySelector('[data-id="typist"]').classList.contains('active'),
     mac_auto_wake: document.querySelector('[data-id="mac_auto_wake"]')?.classList.contains('active') || false
   };
