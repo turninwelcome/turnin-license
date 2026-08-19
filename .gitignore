@@ -1,0 +1,18 @@
+# OAuth credentials — NEVER commit this
+client_secret.json
+token.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Data (persisted on Render disk)
+data.json
+*.tmp
+
+# macOS
+.DS_Store

@@ -583,6 +583,7 @@ footer{
         </div>
         
         <input type="email" id="userEmail" class="buy-input" placeholder="Your email address" required />
+        <input type="text" id="userVenmoName" class="buy-input" placeholder="Your Venmo display name (e.g. John-Smith)" required />
         
         <button id="orderBtn" class="btn-primary" style="width:100%" onclick="submitOrder()">Pay via Venmo</button>
         
@@ -590,7 +591,9 @@ footer{
           <p style="font-size:13px; color:var(--text2); line-height:1.5">
             This purchase unlocks exactly one assignment. Pay <strong id="finalAmount">$2</strong> via Venmo to complete activation.
           </p>
-          <a href="https://account.venmo.com/u/ezra-mezrich" target="_blank" class="btn-ghost" style="margin-top:16px; width:100%">Open Venmo</a>
+          <a id="venmoLink" href="https://account.venmo.com/u/ezra-mezrich" target="_blank" class="btn-ghost" style="margin-top:16px; width:100%; text-align:center; display:block">Open Venmo →</a>
+          <button id="paidBtn" class="btn-primary" style="width:100%; margin-top:12px; display:none" onclick="confirmPaid()">I've Paid ✓</button>
+          <p id="paidStatus" style="display:none; margin-top:12px; font-size:13px; color:var(--green); text-align:center;"></p>
         </div>
       </div>
     </div>
@@ -729,10 +732,15 @@ function calculateTotal() {
 syncTypistBundle();
 calculateTotal();
 
+// Stores order info after submitOrder so confirmPaid can use it
+let _currentOrder = null;
+
 async function submitOrder() {
   const email = document.getElementById('userEmail').value.trim();
+  const venmoName = document.getElementById('userVenmoName').value.trim();
   if (!email) { alert("Please enter your email."); return; }
-  
+  if (!venmoName) { alert("Please enter your Venmo display name."); return; }
+
   const btn = document.getElementById('orderBtn');
   btn.disabled = true;
   btn.textContent = "Processing...";
@@ -746,32 +754,76 @@ async function submitOrder() {
     typist: document.querySelector('[data-id="typist"]').classList.contains('active'),
     mac_auto_wake: document.querySelector('[data-id="mac_auto_wake"]')?.classList.contains('active') || false
   };
-  
+
   const total = parseFloat(document.getElementById('totalPrice').textContent.replace('$',''));
 
   try {
     const res = await fetch(`${RENDER_URL}/api/order`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ email, features, total_price: total })
+      body: JSON.stringify({ email, venmo_name: venmoName, features, total_price: total })
     });
     const data = await res.json();
-      if (data.ok) {
-        document.getElementById('orderResult').style.display = 'block';
-        document.getElementById('finalAmount').textContent = `$${total}`;
-        btn.style.display = 'none';
-        document.getElementById('userEmail').style.display = 'none';
-      } else {
-        alert("Error: " + data.error);
-        btn.disabled = false;
-        btn.textContent = "Pay via Venmo";
-      }
-    } catch (e) {
-      alert("Could not reach the server. Please try again later.");
+    if (data.ok) {
+      _currentOrder = { orderId: data.order_id, venmoName, amount: total };
+      document.getElementById('orderResult').style.display = 'block';
+      document.getElementById('finalAmount').textContent = `$${total}`;
+      btn.style.display = 'none';
+      document.getElementById('userEmail').style.display = 'none';
+      document.getElementById('userVenmoName').style.display = 'none';
+      // Show the "I've Paid" button after a short delay so they see the Venmo link first
+      setTimeout(() => {
+        document.getElementById('paidBtn').style.display = 'block';
+      }, 3000);
+    } else {
+      alert("Error: " + data.error);
       btn.disabled = false;
       btn.textContent = "Pay via Venmo";
     }
+  } catch (e) {
+    alert("Could not reach the server. Please try again later.");
+    btn.disabled = false;
+    btn.textContent = "Pay via Venmo";
   }
+}
+
+async function confirmPaid() {
+  if (!_currentOrder) return;
+  const btn = document.getElementById('paidBtn');
+  const status = document.getElementById('paidStatus');
+  btn.disabled = true;
+  btn.textContent = "Verifying…";
+
+  try {
+    const res = await fetch(`${RENDER_URL}/api/paid`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        venmo_name: _currentOrder.venmoName,
+        order_id:   _currentOrder.orderId,
+        amount:     _currentOrder.amount,
+      })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      btn.style.display = 'none';
+      status.textContent = "✓ Payment received! Your license key will be emailed to you shortly.";
+      status.style.display = 'block';
+    } else {
+      btn.disabled = false;
+      btn.textContent = "I've Paid ✓";
+      status.textContent = "We couldn't verify your payment yet. Please try again in a moment.";
+      status.style.color = 'var(--text2)';
+      status.style.display = 'block';
+    }
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = "I've Paid ✓";
+    status.textContent = "Network error. Please try again.";
+    status.style.color = 'var(--text2)';
+    status.style.display = 'block';
+  }
+}
 
 // FAQ
 function toggleFaq(btn){

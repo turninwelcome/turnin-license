@@ -4,13 +4,34 @@ import json
 import os
 import secrets
 import string
+import threading
 import requests
 from datetime import datetime
 from functools import wraps
+from pathlib import Path
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, template_folder=os.path.join(BASE_DIR, 'templates'))
 CORS(app) # Allow landing page to talk to the server
+
+# Rate limiting — requires flask-limiter (pip install flask-limiter)
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    limiter = Limiter(
+        get_remote_address,
+        app=app,
+        default_limits=[],
+        storage_uri="memory://",
+    )
+    _limiter_available = True
+except ImportError:
+    limiter = None
+    _limiter_available = False
+    print("[WARNING] flask-limiter not installed; rate limiting disabled. Run: pip install flask-limiter")
+
+# Thread lock for all data file access (AUD-QUAL-006)
+_data_lock = threading.Lock()
 
 # --- ROUTES ---
 
@@ -19,7 +40,8 @@ def index():
     return render_template("index.html")
 
 # --- CONFIG ---
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "").strip()
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
 SECRET_KEY = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 MAIL_PROXY_URL = os.environ.get("MAIL_PROXY_URL")
 APP_DOWNLOAD_URL = os.environ.get("APP_DOWNLOAD_URL", "https://turnin.app")
@@ -29,34 +51,66 @@ LATEST_APP_VERSION = os.environ.get("LATEST_APP_VERSION", "0.1.0").strip()
 # Use absolute path for the data file so it doesn't get lost in Render subdirectories
 DATA_FILE = os.path.join(BASE_DIR, "data.json")
 
-def load_data():
+
+def _atomic_write(path: str, data: str) -> None:
+    target = Path(path)
+    tmp_path = target.with_suffix(target.suffix + ".tmp")
+    tmp_path.write_text(data)
+    tmp_path.replace(target)
+
+
+def _quarantine_bad_json(path: str) -> None:
+    target = Path(path)
     try:
-        if os.path.exists(DATA_FILE):
-            with open(DATA_FILE, "r") as f:
-                content = f.read().strip()
-                if not content:
-                    return {"keys": {}, "orders": {}}
-                return json.loads(content)
-    except Exception as e:
-        print(f"Error loading data: {e}")
-    return {"keys": {}, "orders": {}}
+        if not target.exists():
+            return
+        stamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        backup = target.with_name(f"{target.stem}.corrupt.{stamp}{target.suffix}")
+        target.replace(backup)
+    except Exception:
+        pass
+
+def load_data():
+    """Load data.json under the thread lock (AUD-QUAL-006)."""
+    with _data_lock:
+        try:
+            if os.path.exists(DATA_FILE):
+                with open(DATA_FILE, "r") as f:
+                    content = f.read().strip()
+                    if not content:
+                        return {"keys": {}, "orders": {}}
+                    return json.loads(content)
+        except Exception as e:
+            print(f"Error loading data: {e}")
+            _quarantine_bad_json(DATA_FILE)
+        return {"keys": {}, "orders": {}}
 
 def save_data(data):
-    try:
-        with open(DATA_FILE, "w") as f:
-            json.dump(data, f, indent=4)
-    except Exception as e:
-        print(f"Error saving data: {e}")
+    """Save data.json under the thread lock (AUD-QUAL-006)."""
+    with _data_lock:
+        try:
+            _atomic_write(DATA_FILE, json.dumps(data, indent=4))
+        except Exception as e:
+            print(f"Error saving data: {e}")
 
 # --- HELPERS ---
-def generate_key():
-    return "TURNIN-" + "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+def generate_key(existing_keys: set = None) -> str:
+    """Generate a unique key; retry on collision (AUD-FUNC-008)."""
+    for _ in range(20):
+        key = "TURNIN-" + "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        if existing_keys is None or key not in existing_keys:
+            return key
+    raise RuntimeError("Could not generate a unique key after 20 attempts")
 
 def generate_order_id():
-    return "ORD-" + "".join(secrets.choice(string.digits) for _ in range(4))
+    return "ORD-" + secrets.token_hex(8).upper()
+
+
+def generate_order_token():
+    return secrets.token_urlsafe(32)
 
 def check_auth(username, password):
-    return username == "admin" and password == ADMIN_PASSWORD
+    return bool(ADMIN_PASSWORD) and username == "admin" and password == ADMIN_PASSWORD
 
 def authenticate():
     return ("<h1>401 Unauthorized</h1>", 401, {'WWW-Authenticate': 'Basic realm="Login Required"'})
@@ -117,12 +171,43 @@ def send_email(to_email, key, features):
         print(f"CONNECTION ERROR during proxy send: {e}")
         return False
 
+
+def send_web_search_approval_email(to_email, order_id):
+    if not MAIL_PROXY_URL:
+        print("CRITICAL: MAIL_PROXY_URL missing.")
+        return False
+    html_content = f"""
+    <div style="font-family: sans-serif; padding: 20px; border: 1px solid #e8d5a3; border-radius: 10px;">
+        <h1 style="color: #8b6914;">Web Search Access Approved</h1>
+        <p><strong>Order ID:</strong> {order_id}</p>
+        <p>The app will continue automatically after it detects this approval.</p>
+    </div>
+    """
+    payload = {"to": to_email, "subject": "Your Web Search Access Was Approved", "body": html_content}
+    try:
+        resp = requests.post(MAIL_PROXY_URL, json=payload, timeout=15)
+        return resp.text == "OK"
+    except Exception as e:
+        print(f"CONNECTION ERROR during web-search email send: {e}")
+        return False
+
 # --- ROUTES ---
 
+def _rate_limit(limit_string):
+    """Apply a flask-limiter limit if available, otherwise no-op."""
+    def decorator(f):
+        if _limiter_available and limiter:
+            return limiter.limit(limit_string)(f)
+        return f
+    return decorator
+
+
 @app.route("/api/order", methods=["POST"])
+@_rate_limit("10 per hour")
 def create_order():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     email = data.get("email")
+    venmo_name = data.get("venmo_name", "").strip()
     features = data.get("features", {}) # e.g. {"base": True, "humanizer": True}
     total_price = data.get("total_price", 0)
     
@@ -137,21 +222,25 @@ def create_order():
         return jsonify({"ok": False, "error": "Email required"}), 400
     
     order_id = generate_order_id()
+    order_token = generate_order_token()
     store = load_data()
     store["orders"][order_id] = {
         "email": email,
+        "venmo_name": venmo_name,
         "features": features,
         "total_price": total_price,
         "status": "pending",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "status_token": order_token,
     }
     save_data(store)
     
-    return jsonify({"ok": True, "order_id": order_id})
+    return jsonify({"ok": True, "order_id": order_id, "status_token": order_token})
 
 @app.route("/api/validate", methods=["POST"])
+@_rate_limit("30 per minute; 200 per hour")
 def validate_key():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     key = data.get("key", "").strip().upper()
     google_id = data.get("google_id", "").strip()
     google_email = data.get("google_email", "").strip()
@@ -183,6 +272,55 @@ def latest_release():
         "download_url": APP_DOWNLOAD_URL,
     })
 
+
+@app.route("/api/order-status/<order_id>")
+def order_status(order_id):
+    token = (request.args.get("token") or request.headers.get("X-Order-Token") or "").strip()
+    store = load_data()
+    order = store["orders"].get(order_id)
+    if not order or not token or token != str(order.get("status_token") or ""):
+        return jsonify({"ok": False, "error": "Order not found"}), 404
+    return jsonify({
+        "ok": True,
+        "order": {"status": order.get("status")},
+    })
+
+# --- VENMO PAYMENT VERIFICATION ---
+
+@app.route("/api/paid", methods=["POST"])
+@_rate_limit("5 per minute; 20 per hour")
+def user_paid():
+    """
+    Called by the "I've Paid" button on the frontend.
+    Body: { "venmo_name": "John Smith", "order_id": "ORD-...", "amount": 3.25 }
+    """
+    from auto_approve import process_payment
+
+    data = request.get_json(silent=True) or {}
+    venmo_name = data.get("venmo_name", "").strip()
+    order_id   = data.get("order_id", "").strip()
+    amount     = data.get("amount")
+
+    if not venmo_name or not order_id or amount is None:
+        return jsonify({"ok": False, "error": "venmo_name, order_id, and amount are required"}), 400
+
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "amount must be a number"}), 400
+
+    def run():
+        result = process_payment(venmo_name, order_id, amount)
+        print(f"[paid] order={order_id} result={result}")
+
+    threading.Thread(target=run, daemon=True).start()
+
+    return jsonify({
+        "ok": True,
+        "message": "We're verifying your payment. Your license key will be emailed to you shortly."
+    })
+
+
 # --- ADMIN ROUTES ---
 
 @app.route("/admin")
@@ -193,6 +331,9 @@ def admin_dashboard():
     pending_orders = {k: v for k, v in store["orders"].items() if v["status"] == "pending"}
     active_keys = store["keys"]
     
+    # AUD-SEC-004: Use render_template_string with explicit | e escaping on all
+    # user-supplied values to prevent XSS. Jinja2's autoescape is not guaranteed
+    # active for render_template_string without Environment(autoescape=True).
     html = """
     <html>
     <head><title>Turnin Admin</title>
@@ -212,7 +353,7 @@ def admin_dashboard():
         <h1>Turnin Admin Dashboard</h1>
         
         {% if msg %}
-        <div class="alert alert-success">Action Completed: {{ msg }}</div>
+        <div class="alert alert-success">Action Completed: {{ msg | e }}</div>
         {% endif %}
         
         <h2>Pending Orders</h2>
@@ -220,23 +361,25 @@ def admin_dashboard():
             <tr>
                 <th>Order ID</th>
                 <th>Email</th>
+                <th>Venmo Name</th>
                 <th>Total</th>
                 <th>Features</th>
                 <th>Action</th>
             </tr>
             {% for id, order in pending.items() %}
             <tr>
-                <td>{{ id }}</td>
-                <td>{{ order.email }}</td>
-                <td>${{ order.total_price }}</td>
+                <td>{{ id | e }}</td>
+                <td>{{ order.email | e }}</td>
+                <td>{{ (order.venmo_name or '—') | e }}</td>
+                <td>${{ order.total_price | e }}</td>
                 <td>
                     {% for f, val in order.features.items() %}
-                        {% if val %} {{ f }} {% endif %}
+                        {% if val %} {{ f | e }} {% endif %}
                     {% endfor %}
                 </td>
                 <td>
-                    <form action="/admin/approve/{{ id }}" method="POST" style="display:inline;">
-                        <button class="btn btn-approve">Approve & Send Key</button>
+                    <form action="/admin/approve/{{ id | e }}" method="POST" style="display:inline;">
+                        <button class="btn btn-approve">Approve &amp; Send Key</button>
                     </form>
                 </td>
             </tr>
@@ -254,16 +397,16 @@ def admin_dashboard():
             </tr>
             {% for key, info in keys.items() %}
             <tr>
-                <td>{{ key }}</td>
-                <td>{{ info.email }}</td>
+                <td>{{ key | e }}</td>
+                <td>{{ info.email | e }}</td>
                 <td>
                     {% for f, val in info.features.items() %}
-                        {% if val %} {{ f }} {% endif %}
+                        {% if val %} {{ f | e }} {% endif %}
                     {% endfor %}
                 </td>
-                <td>{{ info.google_id or 'Not linked' }}</td>
+                <td>{{ (info.google_id or 'Not linked') | e }}</td>
                 <td>
-                    <form action="/admin/revoke/{{ key }}" method="POST" style="display:inline;" onsubmit="return confirm('Really revoke this key?')">
+                    <form action="/admin/revoke/{{ key | e }}" method="POST" style="display:inline;" onsubmit="return confirm('Really revoke this key?')">
                         <button class="btn btn-revoke">Revoke</button>
                     </form>
                 </td>
@@ -286,15 +429,17 @@ def approve_order(order_id):
     if order["status"] == "approved":
         return "Already approved", 400
     
-    # 1. Generate Key
-    key = generate_key()
+    # 1. Generate Key (collision-safe — AUD-FUNC-008)
+    features = order.get("features") or {}
+    is_web_search_only = bool(features.get("web_search")) and set(features.keys()) == {"web_search"}
+    key = generate_key(existing_keys=set(store["keys"].keys()))
     
     # 2. Save Key
     store["keys"][key] = {
         "email": order["email"],
         "features": order["features"],
         "google_id": None,
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now().isoformat(),
     }
     
     # 3. Mark order as approved
@@ -303,7 +448,11 @@ def approve_order(order_id):
     save_data(store)
     
     # 4. Send Email
-    success = send_email(order["email"], key, order["features"])
+    success = (
+        send_web_search_approval_email(order["email"], order_id)
+        if is_web_search_only
+        else send_email(order["email"], key, order["features"])
+    )
     
     if success:
         return redirect("/admin?msg=Approved+and+Email+Sent")
