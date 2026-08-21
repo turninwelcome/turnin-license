@@ -79,7 +79,7 @@ def find_venmo_payment(venmo_display_name: str, expected_amount: float) -> bool:
     since = datetime.now(timezone.utc) - timedelta(minutes=VENMO_WINDOW_MINS)
     since_epoch = int(since.timestamp())
     # Fetch ALL recent Venmo emails — no subject filter so we catch every format
-    query = f'from:venmo@venmo.com after:{since_epoch}'
+    query = 'from:venmo@venmo.com'
 
     results = service.users().messages().list(userId="me", q=query).execute()
     messages = results.get("messages", [])
