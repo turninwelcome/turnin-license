@@ -44,6 +44,15 @@ def _gmail_service():
     return build("gmail", "v1", credentials=creds)
 
 
+def _get_email_subject(service, msg_id: str) -> str:
+    msg = service.users().messages().get(userId="me", id=msg_id, format="full").execute()
+    headers = msg.get("payload", {}).get("headers", [])
+    for h in headers:
+        if h.get("name", "").lower() == "subject":
+            return h.get("value", "")
+    return ""
+
+
 def _get_email_body(service, msg_id: str) -> str:
     msg = service.users().messages().get(userId="me", id=msg_id, format="full").execute()
     parts = msg.get("payload", {}).get("parts", [])
@@ -54,8 +63,13 @@ def _get_email_body(service, msg_id: str) -> str:
     data = msg.get("payload", {}).get("body", {}).get("data", "")
     return base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
 
+
 def find_venmo_payment(venmo_display_name: str, expected_amount: float) -> bool:
-    """Returns True if a matching Venmo payment email is found in Gmail."""
+    """
+    Returns True if a Venmo email from venmo@venmo.com arrived in the last
+    VENMO_WINDOW_MINS minutes whose subject contains the buyer's name AND
+    whose subject or body contains a dollar amount >= expected_amount.
+    """
     try:
         service = _gmail_service()
     except Exception as e:
@@ -64,7 +78,8 @@ def find_venmo_payment(venmo_display_name: str, expected_amount: float) -> bool:
 
     since = datetime.now(timezone.utc) - timedelta(minutes=VENMO_WINDOW_MINS)
     since_epoch = int(since.timestamp())
-    query = f'from:venmo@venmo.com subject:"paid you" after:{since_epoch}'
+    # Fetch ALL recent Venmo emails — no subject filter so we catch every format
+    query = f'from:venmo@venmo.com after:{since_epoch}'
 
     results = service.users().messages().list(userId="me", q=query).execute()
     messages = results.get("messages", [])
@@ -76,17 +91,22 @@ def find_venmo_payment(venmo_display_name: str, expected_amount: float) -> bool:
     name_lower = venmo_display_name.strip().lower()
 
     for m in messages:
-        body = _get_email_body(service, m["id"])
-        if name_lower not in body.lower():
+        subject = _get_email_subject(service, m["id"])
+        # Name must appear in the subject line
+        if name_lower not in subject.lower():
             continue
-        amounts = re.findall(r"\$(\d+(?:\.\d{1,2})?)", body)
+        # Look for the dollar amount in subject first, then fall back to body
+        search_text = subject + " " + _get_email_body(service, m["id"])
+        amounts = re.findall(r"\$(\d+(?:\.\d{1,2})?)", search_text)
         for a in amounts:
             if float(a) >= expected_amount:
-                log.info("Payment confirmed: %s paid $%s", venmo_display_name, a)
+                log.info("Payment confirmed: %s paid $%s (subject: %s)", venmo_display_name, a, subject)
                 return True
+        log.info("Name matched in subject but amount not found/insufficient (subject: %s)", subject)
 
     log.info("No matching Venmo payment for %s / $%.2f", venmo_display_name, expected_amount)
     return False
+
 
 def send_alert_email(subject: str, body: str):
     """Send yourself an alert email via Gmail API."""
